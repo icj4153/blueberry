@@ -54,26 +54,33 @@ def index():
 def convert():
     file = request.files['file']
     wb = openpyxl.load_workbook(file)
-    ws = wb.active
+
+    # 기존 Delivery 시트 삭제
+    if len(wb.sheetnames) > 0:
+        del wb[wb.sheetnames[0]]
+
+    ws = wb.create_sheet(title="발주서")
+
+    input_wb = openpyxl.load_workbook(file)
+    input_ws = input_wb.active
 
     col_map = {}
-    headers = [cell.value for cell in ws[1]]
+    headers = [cell.value for cell in input_ws[1]]
     for idx, header in enumerate(headers):
         col_map[header] = idx + 1
 
-    dest_ws = wb.create_sheet(title="발주서")
     out_headers = ["주문번호", "주문상품명", "상품모델", "수량", "수취인명", "수취인 우편번호",
                    "수취인 주소", "수취인 전화번호", "수취인 이동통신", "배송메시지", "상품코드", "주문자명"]
-    dest_ws.append(out_headers)
+    ws.append(out_headers)
 
-    for cell in dest_ws[1]:
+    for cell in ws[1]:
         cell.fill = PatternFill(start_color="ADD8E6", end_color="ADD8E6", fill_type="solid")
         cell.font = Font(bold=True)
         cell.alignment = Alignment(horizontal="center", vertical="center")
 
     summary = defaultdict(int)
 
-    for row in ws.iter_rows(min_row=2, values_only=True):
+    for row in input_ws.iter_rows(min_row=2, values_only=True):
         option = row[col_map["등록옵션명"] - 1]
         formatted = format_option_text(option)
         new_row = [
@@ -90,14 +97,24 @@ def convert():
             row[col_map["주문번호"] - 1],
             row[col_map["구매자"] - 1]
         ]
-        dest_ws.append(new_row)
+        ws.append(new_row)
         summary[formatted] += int(row[col_map["구매수(수량)"] - 1])
 
-    for col in dest_ws.columns:
+    for col in ws.columns:
         max_length = max(len(str(cell.value)) if cell.value else 0 for cell in col)
-        dest_ws.column_dimensions[col[0].column_letter].width = max_length + 2
+        ws.column_dimensions[col[0].column_letter].width = max_length + 2
 
     summary_ws = wb.create_sheet(title="발주 정리표")
+
+    # 날짜 포함 제목 추가
+    today = datetime.datetime.today()
+    today_kr = today.strftime("%-m월 %-d일") if hasattr(today, 'strftime') else today.strftime("%m월 %d일")
+    summary_ws.append([f"{today_kr} 하입월드 발주"])
+    summary_ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=4)
+    summary_ws["A1"].fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
+    summary_ws["A1"].font = Font(bold=True)
+    summary_ws["A1"].alignment = Alignment(horizontal="center", vertical="center")
+
     summary_ws.append(["사이즈", "개수", "단가", "합계"])
 
     total_count = 0
@@ -115,8 +132,7 @@ def convert():
         summary_ws.column_dimensions[col[0].column_letter].auto_size = True
 
     buffer = BytesIO()
-    today = datetime.datetime.today().strftime("%y%m%d")
-    filename = f"{today} 하입월드 발주서.xlsx"
+    filename = f"{today.strftime('%y%m%d')} 하입월드 발주서.xlsx"
     wb.save(buffer)
     buffer.seek(0)
 
