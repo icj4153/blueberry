@@ -103,7 +103,7 @@ def convert():
     summary_ws = wb.create_sheet(title="발주 정리표")
 
     # 날짜 포함 제목 추가
-    today = datetime.datetime.today()
+    today = datetime.datetime.now()
     today_kr = today.strftime("%-m월 %-d일") if hasattr(today, 'strftime') else today.strftime("%m월 %d일")
     summary_ws.append([f"{today_kr} 하입월드 발주"])
     summary_ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=4)
