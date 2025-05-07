@@ -4,6 +4,7 @@ from openpyxl.styles import PatternFill, Alignment, Font
 from io import BytesIO
 import datetime
 from collections import defaultdict
+import pytz
 
 app = Flask(__name__)
 
@@ -102,9 +103,9 @@ def convert():
 
     summary_ws = wb.create_sheet(title="발주 정리표")
 
-    # 날짜 포함 제목 추가
-    today = datetime.datetime.now()
-    today_kr = today.strftime("%-m월 %-d일") if hasattr(today, 'strftime') else today.strftime("%m월 %d일")
+    # 날짜 포함 제목 추가 (한국 시간 기준)
+    kst = datetime.datetime.now(pytz.timezone("Asia/Seoul"))
+    today_kr = kst.strftime("%-m월 %-d일") if hasattr(kst, 'strftime') else kst.strftime("%m월 %d일")
     summary_ws.append([f"{today_kr} 하입월드 발주"])
     summary_ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=4)
     summary_ws.cell(row=1, column=1).fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
@@ -130,7 +131,7 @@ def convert():
         summary_ws.column_dimensions[col_cells[0].column_letter].width = max_length + 2
 
     buffer = BytesIO()
-    filename = f"{today.strftime('%y%m%d')} 하입월드 발주서.xlsx"
+    filename = f"{kst.strftime('%y%m%d')} 하입월드 발주서.xlsx"
     wb.save(buffer)
     buffer.seek(0)
 
