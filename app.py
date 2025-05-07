@@ -1,4 +1,3 @@
-응
 from flask import Flask, request, send_file, render_template_string
 import openpyxl
 from openpyxl.styles import PatternFill, Alignment, Font
