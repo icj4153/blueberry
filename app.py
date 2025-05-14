@@ -57,57 +57,52 @@ def index():
 def convert():
     file = request.files['file']
     wb = openpyxl.Workbook()
-    wb.remove(wb.active)  # 기본 시트 제거
+    wb.remove(wb.active)
 
     input_wb = openpyxl.load_workbook(file)
     input_ws = input_wb.active
 
-    col_map = {}
-    headers = [cell.value for cell in input_ws[1]]
-    for idx, header in enumerate(headers):
-        col_map[header] = idx + 1
+    col_map = {cell.value: idx for idx, cell in enumerate(input_ws[1])}
 
     ws = wb.create_sheet(title="발주서")
-    out_headers = ["주문번호", "주문상품명", "상품모델", "수량", "수취인명", "수취인 우편번호",
-                   "수취인 주소", "수취인 전화번호", "수취인 이동통신", "배송메시지", "상품코드", "주문자명"]
-    ws.append(out_headers)
-
+    headers = ["주문번호", "주문상품명", "상품모델", "수량", "수취인명", "수취인 우편번호",
+               "수취인 주소", "수취인 전화번호", "수취인 이동통신", "배송메시지", "상품코드", "주문자명"]
+    ws.append(headers)
     for cell in ws[1]:
         cell.fill = PatternFill(start_color="ADD8E6", end_color="ADD8E6", fill_type="solid")
         cell.font = Font(bold=True)
         cell.alignment = Alignment(horizontal="center", vertical="center")
 
+    rows = []
     summary = defaultdict(int)
-
     for row in input_ws.iter_rows(min_row=2, values_only=True):
-        option = row[col_map["등록옵션명"] - 1]
+        option = row[col_map["등록옵션명"]]
         formatted = format_option_text(option)
-        new_row = [
-            row[col_map["주문번호"] - 1],
+        item = [
+            row[col_map["주문번호"]],
             formatted,
             formatted,
-            row[col_map["구매수(수량)"] - 1],
-            row[col_map["수취인이름"] - 1],
-            row[col_map["우편번호"] - 1],
-            row[col_map["수취인 주소"] - 1],
-            row[col_map["수취인전화번호"] - 1],
-            row[col_map["수취인전화번호"] - 1],
-            row[col_map["배송메세지"] - 1],
-            row[col_map["주문번호"] - 1],
-            row[col_map["구매자"] - 1]
+            row[col_map["구매수(수량)"]],
+            row[col_map["수취인이름"]],
+            row[col_map["우편번호"]],
+            row[col_map["수취인 주소"]],
+            row[col_map["수취인전화번호"]],
+            row[col_map["수취인전화번호"]],
+            row[col_map["배송메세지"]],
+            row[col_map["주문번호"]],
+            row[col_map["구매자"]]
         ]
-        ws.append(new_row)
-        summary[formatted] += int(row[col_map["구매수(수량)"] - 1])
+        ws.append(item)
+        rows.append(item)
+        summary[formatted] += int(row[col_map["구매수(수량)"]])
 
-    for col_cells in ws.columns:
-        max_length = max(len(str(cell.value)) if cell.value else 0 for cell in col_cells)
-        ws.column_dimensions[col_cells[0].column_letter].width = max_length + 2
+    for col in ws.columns:
+        max_length = max(len(str(cell.value)) if cell.value else 0 for cell in col)
+        ws.column_dimensions[col[0].column_letter].width = max_length + 2
 
     summary_ws = wb.create_sheet(title="발주 정리표")
-
-    # 날짜 포함 제목 추가 (한국 시간 기준)
     kst = datetime.datetime.now(pytz.timezone("Asia/Seoul"))
-    today_kr = kst.strftime("%-m월 %-d일") if hasattr(kst, 'strftime') else kst.strftime("%m월 %d일")
+    today_kr = kst.strftime("%-m월 %-d일")
     summary_ws.append([f"{today_kr} 하입월드 발주"])
     summary_ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=4)
     summary_ws.cell(row=1, column=1).fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
@@ -115,7 +110,6 @@ def convert():
     summary_ws.cell(row=1, column=1).alignment = Alignment(horizontal="center", vertical="center")
 
     summary_ws.append(["사이즈", "개수", "단가", "합계"])
-
     total_count = 0
     total_sum = 0
     for key in summary:
@@ -125,24 +119,32 @@ def convert():
         total_count += count
         total_sum += total
         summary_ws.append([key, count, price, total])
-
     summary_ws.append(["", total_count, "", total_sum])
+    for col in summary_ws.iter_cols(min_row=2, max_row=summary_ws.max_row):
+        max_length = max(len(str(cell.value)) if cell.value else 0 for cell in col)
+        summary_ws.column_dimensions[col[0].column_letter].width = max_length + 2
 
-    for col_cells in summary_ws.iter_cols(min_row=2, max_row=summary_ws.max_row):
-        max_length = max(len(str(cell.value)) if cell.value else 0 for cell in col_cells)
-        summary_ws.column_dimensions[col_cells[0].column_letter].width = max_length + 2
+    sorted_ws = wb.create_sheet(title="발주서_크기순")
+    sorted_ws.append(headers)
+    for cell in sorted_ws[1]:
+        cell.fill = PatternFill(start_color="ADD8E6", end_color="ADD8E6", fill_type="solid")
+        cell.font = Font(bold=True)
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+
+    rows_sorted = sorted(rows, key=lambda x: x[2])  # 상품모델 기준 정렬
+    for item in rows_sorted:
+        sorted_ws.append(item)
+    for col in sorted_ws.columns:
+        max_length = max(len(str(cell.value)) if cell.value else 0 for cell in col)
+        sorted_ws.column_dimensions[col[0].column_letter].width = max_length + 2
 
     buffer = BytesIO()
     filename = f"{kst.strftime('%y%m%d')} 하입월드 발주서.xlsx"
     wb.save(buffer)
     buffer.seek(0)
 
-    return send_file(
-        buffer,
-        as_attachment=True,
-        download_name=filename,
-        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    )
+    return send_file(buffer, as_attachment=True, download_name=filename,
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
 if __name__ == "__main__":
     app.run(debug=True)
