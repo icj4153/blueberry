@@ -27,14 +27,14 @@ HTML_TEMPLATE = """
 
 unit_prices = {
     "14mm이상 400g": 17000,
-    "14mm이상 600g": 25000,
-    "14mm이상 1kg": 39000,
+    "14mm이상 600g": 24000,
+    "14mm이상 1kg": 37000,
     "16mm이상 400g": 20000,
-    "16mm이상 600g": 29000,
-    "16mm이상 1kg": 47000,
-    "18mm이상 400g": 24000,
-    "18mm이상 600g": 34000,
-    "18mm이상 1kg": 57000
+    "16mm이상 600g": 28000,
+    "16mm이상 1kg": 44000,
+    "18mm이상 400g": 23000,
+    "18mm이상 600g": 32500,
+    "18mm이상 1kg": 53000
 }
 
 def format_option_text(text):
@@ -66,7 +66,7 @@ def convert():
 
     ws = wb.create_sheet(title="발주서")
     headers = ["주문번호", "주문상품명", "상품모델", "수량", "수취인명", "수취인 우편번호",
-               "수취인 주소", "수취인 전화번호", "수취인 이동통신", "배송메시지", "상품코드", "주문자명"]
+               "수취인 주소", "수취인 전화번호", "수취인 이동통신", "배송메시지", "상품코드", "주문자명", "박스단위", "부피단위"]
     ws.append(headers)
     for cell in ws[1]:
         cell.fill = PatternFill(start_color="ADD8E6", end_color="ADD8E6", fill_type="solid")
@@ -90,7 +90,9 @@ def convert():
             row[col_map["수취인전화번호"]],
             row[col_map["배송메세지"]],
             row[col_map["주문번호"]],
-            row[col_map["구매자"]]
+            row[col_map["구매자"]],
+            1,  # 박스단위 기본값
+            60  # 부피단위 기본값
         ]
         ws.append(item)
         rows.append(item)
@@ -123,20 +125,6 @@ def convert():
     for col in summary_ws.iter_cols(min_row=2, max_row=summary_ws.max_row):
         max_length = max(len(str(cell.value)) if cell.value else 0 for cell in col)
         summary_ws.column_dimensions[col[0].column_letter].width = max_length + 2
-
-    sorted_ws = wb.create_sheet(title="발주서_크기순")
-    sorted_ws.append(headers)
-    for cell in sorted_ws[1]:
-        cell.fill = PatternFill(start_color="ADD8E6", end_color="ADD8E6", fill_type="solid")
-        cell.font = Font(bold=True)
-        cell.alignment = Alignment(horizontal="center", vertical="center")
-
-    rows_sorted = sorted(rows, key=lambda x: x[2])  # 상품모델 기준 정렬
-    for item in rows_sorted:
-        sorted_ws.append(item)
-    for col in sorted_ws.columns:
-        max_length = max(len(str(cell.value)) if cell.value else 0 for cell in col)
-        sorted_ws.column_dimensions[col[0].column_letter].width = max_length + 2
 
     buffer = BytesIO()
     filename = f"{kst.strftime('%y%m%d')} 하입월드 발주서.xlsx"
